@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import Contact, { IContact } from '../models/Contact';
 import { Types } from 'mongoose';
 
 const router = Router();
 
-router.post('/identify', async (req, res) => {
-  const { email, phoneNumber } = req.body;
+router.post('/identify', async (req: Request, res: Response) => {
+  const { email, phoneNumber }: { email?: string; phoneNumber?: string } = req.body;
 
   try {
     if (!email && !phoneNumber) {
@@ -13,10 +13,12 @@ router.post('/identify', async (req, res) => {
     }
 
     // Find existing contacts
-    const existingContacts = await Contact.find({ $or: [{ email }, { phoneNumber }] }).sort({ createdAt: 1 });
+    const existingContacts = await Contact.find({
+      $or: [{ email }, { phoneNumber }]
+    }).sort({ createdAt: 1 });
 
     let primaryContact: IContact | null = null;
-    let secondaryContactIds: number[] = [];
+    let secondaryContactIds: Types.ObjectId[] = [];
 
     // If no existing contacts, create a new primary contact
     if (existingContacts.length === 0) {
@@ -40,10 +42,10 @@ router.post('/identify', async (req, res) => {
               email: existingContact.email,
               phoneNumber: existingContact.phoneNumber,
               linkPrecedence: 'secondary',
-              linkedId: primaryContact._id as unknown as Types.ObjectId,
+              linkedId: primaryContact._id,
             });
             await newSecondaryContact.save();
-            secondaryContactIds.push(newSecondaryContact._id as unknown as number);
+            secondaryContactIds.push(newSecondaryContact._id as Types.ObjectId);
           }
         }
       }
@@ -60,9 +62,9 @@ router.post('/identify', async (req, res) => {
     return res.status(200).json({
       contact: {
         primaryContactId: primaryContact?._id,
-        emails: emails.filter(Boolean),
-        phoneNumbers: phoneNumbers.filter(Boolean),
-        secondaryContactIds,
+        emails: emails.filter((email): email is string => !!email),
+        phoneNumbers: phoneNumbers.filter((phoneNumber): phoneNumber is string => !!phoneNumber),
+        secondaryContactIds: secondaryContactIds.filter((id): id is Types.ObjectId => !!id),
       },
     });
   } catch (error: any) {
